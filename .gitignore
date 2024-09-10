@@ -174,3 +174,4 @@ dist
 .editorconfig
 .gitattributes
 .prettierrc
+wrangler.toml

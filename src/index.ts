@@ -44,10 +44,9 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
     headers: { 'Authorization': `Bearer ${env.API_TOKEN}` },
   });
 
-  // TODO: Create exception for 404 when no live recource is available
-  // if (!response.ok) {
-  //   throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
-  // }
+  if (!response.ok) {
+    throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
+  }
 
   return response;
 }
@@ -58,7 +57,7 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
  * @param {Env} env - The environment variables.
  * @returns {Promise<Response>} The image response.
  */
-async function handleImageRequest(request: Request, env: Env): Promise<Response> {
+export async function handleImageRequest(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const id = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_]/g, '-');
   const variant = url.searchParams.get("variant")?.replace(/[^a-zA-Z0-9-_]/g, '');
@@ -69,10 +68,10 @@ async function handleImageRequest(request: Request, env: Env): Promise<Response>
   }
 
   const bucket = env.R2_IMAGES_BUCKET;
-  const cacheKey = `${CONFIG.CACHE_KEY_PREFIX}/${id}/${variant}`;
+  const cacheKey = `${env.CACHE_KEY_PREFIX}/${id}/${variant}`;
 
   try {
-    if(CONFIG.RATELIMIT_ENABLED) {
+    if(env.RATELIMIT_ENABLED) {
       if (!await RateLimiter.allowRequest(request, env)) {
         throw new RateLimitError('Too many requests');
       }
@@ -124,25 +123,34 @@ async function handleImageRequest(request: Request, env: Env): Promise<Response>
  * @returns {Response} The final image response.
  */
 function createImageResponse(response: Response | R2ObjectBody, isCacheHit: boolean): Response {
-  const headers = new Headers((response instanceof Response ? response : response as R2HTTPMetadata)?.headers);
+  let headers = new Headers();
+  let body: BodyInit | null = null;
+  let status = 200;
+
+  if (response instanceof Response) {
+    headers = new Headers(response.headers);
+    body = response.body;
+    status = response.status;
+  } else {
+    if (response.httpMetadata) {
+      for (const [key, value] of Object.entries(response.httpMetadata)) {
+        if (typeof value === 'string') {
+          headers.set(key, value);
+        }
+      }
+    }
+    body = response.body;
+  }
+
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'image/jpeg');
   }
   headers.set('x-r2-cache', isCacheHit ? 'HIT' : 'MISS');
 
-  return new Response(response.body, {
-    headers,
-    status: response instanceof Response ? response.status : 200,
-  });
+  return new Response(body, { headers, status });
 }
 
 export default {
-  /**
-   * Main entry point for the Cloudflare Worker.
-   * @param {Request} request - The incoming request.
-   * @param {Env} env - The environment variables.
-   * @returns {Promise<Response>} The response to send back.
-   */
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method !== 'GET') {
       return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET' } });

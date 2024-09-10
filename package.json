@@ -1,18 +1,33 @@
 {
   "name": "cloudflare-images-worker",
-  "packageManager": "yarn@3.7.0",
-  "version": "0.0.1",
+  "version": "0.1",
+  "description": "A Cloudflare Worker for proxying and caching images",
+  "main": "dist/index.js",
   "scripts": {
     "init": "node init-config.js",
-    "dev": "wrangler dev src/index.ts --local",
-    "start": "WRANGLER_SEND_METRICS=false wrangler dev src/index.ts --local",
     "update-config": "node update-config.js",
-    "build": "npm run update-config && wrangler deploy --dry-run --outdir=dist",
-    "deploy": "npm run build && wrangler deploy"
+    "build": "npm run update-config && wrangler build",
+    "deploy": "npm run build && wrangler publish",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "image",
+    "proxy",
+    "cache"
+  ],
+  "author": "cloudflare-images-worker@johankuijt.com",
+  "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240903.0",
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "@types/jest": "^29.5.11",
     "dotenv": "^16.4.5",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3",
     "wrangler": "^3.75.0"
   }
 }

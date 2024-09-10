@@ -1,16 +1,16 @@
-// types.ts
-
 /**
  * Environment variables and bindings for the Cloudflare Worker.
  */
 export interface Env {
-  IMAGES_CACHE: R2Bucket;
-  ACCOUNT_ID: string;
+  R2_IMAGES_BUCKET: R2Bucket;
   API_TOKEN: string;
+  ACCOUNT_ID: string;
   ACCOUNT_HASH: string;
   LIVE_SOURCE_URL: string;
   LIVE_PUBLIC_DOMAIN: string;
   KV_STORE: KVNamespace;
+  RATELIMIT_ENABLED: string;
+  CACHE_KEY_PREFIX: string;
 }
 
 /**
@@ -88,8 +88,23 @@ export interface Config {
   DEFAULT_CACHE_TTL: number;
 }
 
+export interface R2HTTPMetadata {
+  contentType?: string;
+  contentLanguage?: string;
+  contentDisposition?: string;
+  contentEncoding?: string;
+  cacheControl?: string;
+  cacheExpiry?: Date;
+}
+
 export interface R2PutOptions {
   onlyIf?: Headers | R2Conditional;
+  httpMetadata?: R2HTTPMetadata;
+  customMetadata?: Record<string, string>;
+  md5?: string;
+  sha1?: string;
+  sha256?: string;
+  sha384?: string;
+  sha512?: string;
   expirationTtl?: number;
-
 }
