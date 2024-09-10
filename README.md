@@ -77,10 +77,24 @@ Once deployed, the worker will handle image requests in the following format:
 https://your-worker-subdomain.workers.dev/?id=image-id&variant=image-variant
 ```
 
-- `id`: The identifier of the image in your source system
-- `variant`: The desired variant or size of the image (e.g., 'original', 'thumbnail', etc.)
+- `id`: The image name or path to find the image on the old server and use as id in R2
+- `variant`: The desired variant or size of the image (e.g., 'original', 'thumbnail', etc.) as created in Cloudflare images
 
 The worker will fetch the image from your source URL, cache it in R2, and serve it through Cloudflare's CDN.
+
+**Response:**
+
+The image response will be a binary if it is found on R2 or Cloudflare Images. If it's needed to be uploaded from the source url you will be redirect to the new path of the image on your configured live domain:
+
+```
+# Without variant
+https://cdn.example.com/image/path/file.png
+
+# With variant
+https://cdn.example.com/image/path/file-thumb.png
+```
+
+
 
 ## Development
 

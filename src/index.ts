@@ -44,9 +44,10 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
     headers: { 'Authorization': `Bearer ${env.API_TOKEN}` },
   });
 
-  if (!response.ok) {
-    throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
-  }
+  // TODO: Handle 404s when original source url is not active
+  // if (!response.ok) {
+  //   throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
+  // }
 
   return response;
 }
@@ -58,13 +59,23 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
  * @returns {Promise<Response>} The image response.
  */
 export async function handleImageRequest(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const id = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_]/g, '-');
-  const variant = url.searchParams.get("variant")?.replace(/[^a-zA-Z0-9-_]/g, '');
-  const file_path = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_\/\.]/g, '-');
 
-  if (!id || !variant) {
-    return new Response('Missing id or variant parameter', { status: 400 });
+  const CLOUDFLARE_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'tif', 'tiff', 'svg'];
+
+
+  const url = new URL(request.url);
+  const id = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_]/g, "-");
+  const variant = url.searchParams.get("variant")?.replace(/[^a-zA-Z0-9-_]/g, "") || "";
+  const file_path = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_\/\.]/g, "-");
+  const extension = file_path?.split('.')?.pop()?.toLowerCase();
+  const image_path = file_path?.replace(new RegExp(`\\.(${CLOUDFLARE_IMAGE_EXTENSIONS.join('|')})$`, 'i'), '');
+
+  if (!id) {
+    return new Response('Missing id parameter', { status: 400 });
+  }
+
+  if(!CLOUDFLARE_IMAGE_EXTENSIONS.includes(extension as string)) {
+    return new Response('Invalid image extension', { status: 400 });
   }
 
   const bucket = env.R2_IMAGES_BUCKET;
@@ -82,20 +93,22 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
       return createImageResponse(cachedImage, true);
     }
 
-    let imageResponse: Response;
-    if (variant === 'original') {
-      imageResponse = await fetchOriginalCloudflareImage(env, id);
-    } else {
+    let imageResponse: Response | null = null;
+    if (variant !== '') {
       imageResponse = await fetch(`${CONFIG.IMAGE_DELIVERY_URL}/${env.ACCOUNT_HASH}/${id}/${variant}`);
-    }
+    }    
 
-    if (!imageResponse.ok) {
-      const sourceUrl = `${env.LIVE_SOURCE_URL}/${file_path}`
+    if (!imageResponse || !imageResponse.ok) {
+      imageResponse = await fetchOriginalCloudflareImage(env, id);
+    } 
+
+    if (!imageResponse || !imageResponse.ok) {
+      const sourceUrl = `${env.LIVE_SOURCE_URL}/${image_path}.${extension}`;
       const uploadResponse = await uploadToCloudflareImages(env, sourceUrl, id);
 
       if (uploadResponse.ok) {
-        const postfix = variant === 'original' ? '' : `-${variant}`;
-        return Response.redirect(`${env.LIVE_PUBLIC_DOMAIN}/${file_path}${postfix}`, 302);
+        const postfix = variant !== '' ? `-${variant}` : '';
+        return Response.redirect(`${env.LIVE_PUBLIC_DOMAIN}/${image_path}${postfix}.${extension}`, 302);
       } else {
         throw new CloudflareApiError('Failed to fetch and upload image', uploadResponse.status, await uploadResponse.text());
       }

@@ -7,7 +7,7 @@
     "init": "node init-config.js",
     "update-config": "node update-config.js",
     "build": "npm run update-config && wrangler build",
-    "deploy": "npm run build && wrangler publish",
+    "deploy": "npm run build && wrangler deploy",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
