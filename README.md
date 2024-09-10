@@ -88,10 +88,10 @@ The image response will be a binary if it is found on R2 or Cloudflare Images. I
 
 ```
 # Without variant
-https://cdn.example.com/image/path/file.png
+https://cdn.example.com/id.extension
 
 # With variant
-https://cdn.example.com/image/path/file-thumb.png
+https://cdn.example.com/id-variant.extension
 ```
 
 
