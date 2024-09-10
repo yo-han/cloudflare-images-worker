@@ -1,6 +1,18 @@
 # Cloudflare Image Proxy Worker
 
-A Cloudflare Worker for proxying and caching images, with optional rate limiting and a convenient setup process.
+To prevent exorbitant Cloudflare bills, I developed this worker after several unsuccessful attempts with other repositories. The major advantage of this solution is that you can use Cloudflare image resizing without incurring excessive costs.
+
+### How it works
+
+- For each request, the worker checks if the image is available in your Cloudflare R2 bucket in the requested variation.
+- If not found, it requests the original from your Cloudflare Images account, resizes it, and stores it in the R2 bucket. This eliminates the need for future resizing of the same image.
+- If the original is missing from the Images account, the worker attempts to upload it using a live source URL that matches the requested image.
+
+This approach significantly reduces the number of image transformations performed by Cloudflare, thereby minimizing costs while still leveraging Cloudflare's powerful image resizing capabilities. 
+
+### Disclaimer
+
+While this worker is designed to help manage costs, bugs can happen and unforeseen issues may arise. Always monitor your usage and costs when implementing any new solution.
 
 ## Table of Contents
 
