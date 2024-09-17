@@ -44,10 +44,9 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
     headers: { 'Authorization': `Bearer ${env.API_TOKEN}` },
   });
 
-  // TODO: Handle 404s when original source url is not active
-  // if (!response.ok) {
-  //   throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
-  // }
+  if (!response.ok && env.UPLOAD_FROM_SOURCE === false) {
+    throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
+  }
 
   return response;
 }
@@ -137,7 +136,7 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
       imageResponse = await fetchOriginalCloudflareImage(env, id);
     } 
 
-    if (!imageResponse || !imageResponse.ok) {
+    if (env.UPLOAD_FROM_SOURCE && (!imageResponse || !imageResponse.ok)) {
       const sourceUrl = `${env.LIVE_SOURCE_URL}/${image_path}.${extension}`;
       const uploadResponse = await uploadToCloudflareImages(env, sourceUrl, id);
 

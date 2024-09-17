@@ -16,7 +16,9 @@ const envVariables = [
   { name: 'LIVE_SOURCE_URL', description: 'The live source URL (e.g., https://cdn.example.com/path/)' },
   { name: 'LIVE_PUBLIC_DOMAIN', description: 'The live public domain (e.g., https://cf.example.com)' },
   { name: 'KV_NAMESPACE_ID', description: 'Your KV namespace ID' },
-  { name: 'CACHE_KEY_PREFIX', description: 'Cache key prefix' }
+  { name: 'CACHE_KEY_PREFIX', description: 'Cache key prefix' },
+  { name: 'UPLOAD_FROM_SOURCE', description: 'Upload from source (true/false)' },
+  { name: 'RATELIMIT_ENABLED', description: 'Rate limiting enabled (true/false)' }  
 ];
 
 const envValues = {};
@@ -69,7 +71,8 @@ function updateWranglerToml() {
     '<cloudflare-api-token>': envValues.API_TOKEN,
     '<account_id>': envValues.ACCOUNT_ID,
     '<account_hash>': envValues.ACCOUNT_HASH,
-    '<rate_limit>': process.env.RATELIMIT_ENABLED === 'true' ? 'true' : 'false',
+    '<rate_limit>': envValues.RATELIMIT_ENABLED === 'true' ? 'true' : 'false',
+    '<upload_from_source>': envValues.UPLOAD_FROM_SOURCE === 'true' ? 'true' : 'false',
     'https://cdn.example.com/path/': envValues.LIVE_SOURCE_URL,
     'https://cf.example.com': envValues.LIVE_PUBLIC_DOMAIN
   };

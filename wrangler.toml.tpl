@@ -13,7 +13,8 @@ ACCOUNT_HASH = "<account_hash>"
 LIVE_SOURCE_URL = "https://cdn.example.com/path/"
 LIVE_PUBLIC_DOMAIN = "https://cf.example.com"
 CACHE_KEY_PREFIX = "<cachekey_prefix>"
-RATELIMIT_ENABLED = "<ratelimit>"
+RATELIMIT_ENABLED = <rate_limit>
+UPLOAD_FROM_SOURCE = <upload_from_source>
 
 [[ r2_buckets ]]
 binding = "R2_IMAGES_BUCKET"

@@ -9,8 +9,9 @@ export interface Env {
   LIVE_SOURCE_URL: string;
   LIVE_PUBLIC_DOMAIN: string;
   KV_STORE: KVNamespace;
-  RATELIMIT_ENABLED: string;
+  RATELIMIT_ENABLED: boolean;
   CACHE_KEY_PREFIX: string;
+  UPLOAD_FROM_SOURCE: boolean;
 }
 
 /**

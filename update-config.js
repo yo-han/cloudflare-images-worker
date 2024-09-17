@@ -15,7 +15,8 @@ const replacements = {
   '<bucket_name>': process.env.BUCKET,
   '<cachekey_prefix>': process.env.CACHE_KEY_PREFIX,
   '<kv_namespace_id>': process.env.KV_NAMESPACE_ID,
-  '<rate_limit>': process.env.RATELIMIT_ENABLED === 'true' ? 'true' : 'false'
+  '<rate_limit>': process.env.RATELIMIT_ENABLED === 'true' ? 'true' : 'false',
+  '<upload_from_source>': process.env.UPLOAD_FROM_SOURCE === 'true' ? 'true' : 'false'
 };
 
 for (const [placeholder, envValue] of Object.entries(replacements)) {
