@@ -6,7 +6,7 @@
   "scripts": {
     "init": "node init-config.js",
     "update-config": "node update-config.js",
-    "build": "npm run update-config && wrangler build",
+    "build": "npm run update-config && wrangler deploy --dry-run --outdir=dist",
     "deploy": "npm run build && wrangler deploy",
     "test": "jest",
     "test:watch": "jest --watch",
