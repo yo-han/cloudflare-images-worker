@@ -74,7 +74,7 @@ Before you begin, ensure you have met the following requirements:
 Once deployed, the worker will handle image requests in the following format:
 
 ```
-https://your-worker-subdomain.workers.dev/?id=image-id&variant=image-variant
+https://your-worker-subdomain.workers.dev/<id>-<variant>.png
 ```
 
 - `id`: The image name or path to find the image on the old server and use as id in R2

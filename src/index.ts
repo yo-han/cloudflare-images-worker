@@ -1,4 +1,4 @@
-import { Env } from './types';
+import { Env, ParsedImageUrl } from './types';
 import { RateLimiter } from './rateLimiter';
 import { CONFIG } from './config';
 import { cacheStrategy } from './cacheStrategy';
@@ -52,6 +52,36 @@ async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Respo
   return response;
 }
 
+function parseImageUrl(url: string): ParsedImageUrl | null {
+  // Regular expression to match both URL patterns
+  const regex = /^\/(.+?)(?:-(\d+)x(\d+))?\.([^\.]+)$/;
+  const match = url.match(regex);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, imageId, width, height, extension] = match;
+
+  if (width && height) {
+    return {
+      id: imageId.replace(/[^a-zA-Z0-9-_]/g, "-"),
+      originalPath: imageId,
+      width: parseInt(width) || undefined,
+      height: parseInt(height) || undefined,
+      extension,
+      variant: width ? `${width}x${height}`.replace(/[^a-zA-Z0-9-_]/g, "") : 'original'
+    };
+  } else {
+    return {
+      id: imageId.replace(/[^a-zA-Z0-9-_]/g, "-"),
+      originalPath: imageId,
+      extension,
+      variant: 'original'
+    };
+  }
+}
+
 /**
  * Handles an image request.
  * @param {Request} request - The incoming request.
@@ -62,12 +92,17 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
 
   const CLOUDFLARE_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'tif', 'tiff', 'svg'];
 
-
   const url = new URL(request.url);
-  const id = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_]/g, "-");
-  const variant = url.searchParams.get("variant")?.replace(/[^a-zA-Z0-9-_]/g, "") || "";
-  const file_path = url.searchParams.get("id")?.replace(/[^a-zA-Z0-9-_\/\.]/g, "-");
-  const extension = file_path?.split('.')?.pop()?.toLowerCase();
+  const parsedImage = parseImageUrl(url.pathname);
+	const bucket = env.R2_IMAGES_BUCKET;
+
+    if (!parsedImage) {
+      return new Response('Invalid image URL', { status: 400 });
+    }
+
+	const { id, originalPath, extension, variant} = parsedImage;
+
+  const file_path = originalPath.replace(/[^a-zA-Z0-9-_\/\.]/g, "-");
   const image_path = file_path?.replace(new RegExp(`\\.(${CLOUDFLARE_IMAGE_EXTENSIONS.join('|')})$`, 'i'), '');
 
   if (!id) {
@@ -78,7 +113,7 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
     return new Response('Invalid image extension', { status: 400 });
   }
 
-  const bucket = env.R2_IMAGES_BUCKET;
+  
   const cacheKey = `${env.CACHE_KEY_PREFIX}/${id}/${variant}`;
 
   try {
@@ -107,7 +142,7 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
       const uploadResponse = await uploadToCloudflareImages(env, sourceUrl, id);
 
       if (uploadResponse.ok) {
-        const postfix = variant !== '' ? `-${variant}` : '';
+        const postfix = variant !== 'original' ? `-${variant}` : '';
         return Response.redirect(`${env.LIVE_PUBLIC_DOMAIN}/${image_path}${postfix}.${extension}`, 302);
       } else {
         throw new CloudflareApiError('Failed to fetch and upload image', uploadResponse.status, await uploadResponse.text());
@@ -159,6 +194,7 @@ function createImageResponse(response: Response | R2ObjectBody, isCacheHit: bool
     headers.set('Content-Type', 'image/jpeg');
   }
   headers.set('x-r2-cache', isCacheHit ? 'HIT' : 'MISS');
+  headers.set('Access-Control-Allow-Origin', '*');
 
   return new Response(body, { headers, status });
 }

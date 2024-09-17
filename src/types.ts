@@ -108,3 +108,12 @@ export interface R2PutOptions {
   sha512?: string;
   expirationTtl?: number;
 }
+
+export interface ParsedImageUrl {
+  id: string;
+  originalPath: string;
+  width?: number;
+  height?: number;
+  extension: string;
+  variant: string;
+}
