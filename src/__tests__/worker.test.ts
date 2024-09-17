@@ -34,11 +34,12 @@ describe('handleImageRequest', () => {
         get: jest.fn().mockResolvedValue(null),
         put: jest.fn(),
       } as unknown as KVNamespace,
-      RATELIMIT_ENABLED: 'false',
+      RATELIMIT_ENABLED: false,
+      UPLOAD_FROM_SOURCE: true,
       CACHE_KEY_PREFIX: 'mock-cache-key-prefix',
     };
 
-    mockRequest = new Request('https://worker.dev/?id=test-image&variant=original');
+    mockRequest = new Request('https://worker.dev/test-image-thumbnail.jpg');
     
     // Mock fetch to simulate Cloudflare API response
     globalThis.fetch = jest.fn().mockResolvedValue(new Response('Not Found', { status: 404 }));
@@ -48,7 +49,7 @@ describe('handleImageRequest', () => {
     const badRequest = new Request('https://worker.dev/');
     const response = await handleImageRequest(badRequest, mockEnv);
     expect(response.status).toBe(400);
-    expect(await response.text()).toBe('Missing id or variant parameter');
+    expect(await response.text()).toBe('Invalid image URL');
   });
 
   it('should attempt to fetch from cache first', async () => {
@@ -59,6 +60,6 @@ describe('handleImageRequest', () => {
   it('should handle CloudflareApiError when fetching original image fails', async () => {
     const response = await handleImageRequest(mockRequest, mockEnv);
     expect(response.status).toBe(404);
-    expect(await response.text()).toContain('Cloudflare API Error: Failed to fetch original image');
+    expect(await response.text()).toContain('Cloudflare API Error: Failed to upload image');
   });
 });
