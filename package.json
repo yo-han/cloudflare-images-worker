@@ -22,7 +22,7 @@
   "author": "cloudflare-images-worker@johankuijt.com",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240909.0",
+    "@cloudflare/workers-types": "^4.20240919.0",
     "@types/jest": "^29.5.13",
     "dotenv": "^16.4.5",
     "jest": "^29.7.0",
