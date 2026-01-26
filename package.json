@@ -28,6 +28,6 @@
     "jest": "^30.0.0",
     "ts-jest": "^29.3.2",
     "typescript": "^5.9.3",
-    "wrangler": "^4.16.1"
+    "wrangler": "^4.59.1"
   }
 }
