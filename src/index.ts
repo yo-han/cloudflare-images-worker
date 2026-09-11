@@ -72,7 +72,8 @@ function parseImageUrl(url: string): ParsedImageUrl | null {
  */
 export async function handleImageRequest(request: Request, env: Env): Promise<Response> {
 
-  const CLOUDFLARE_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'tif', 'tiff', 'svg'];
+  // heic/heif/jfif: stored by the upload paths and served by Cloudflare Images (#151).
+  const CLOUDFLARE_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'jfif', 'gif', 'webp', 'avif', 'heic', 'heif', 'tif', 'tiff', 'svg'];
 
   const url = new URL(request.url);
   const parsedImage = parseImageUrl(url.pathname);
@@ -91,7 +92,9 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
     return new Response('Missing id parameter', { status: 400 });
   }
 
-  if(!CLOUDFLARE_IMAGE_EXTENSIONS.includes(extension as string)) {
+  // Case-insensitive: stored extensions keep their upload case (`JPG`). Only the
+  // check lowercases; the source URL and redirect keep the case as requested.
+  if(!CLOUDFLARE_IMAGE_EXTENSIONS.includes(extension.toLowerCase())) {
     return new Response('Invalid image extension', { status: 400 });
   }
 

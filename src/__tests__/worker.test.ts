@@ -202,4 +202,57 @@ describe('handleImageRequest', () => {
       expect(response.headers.get('location')).toBe(location);
     });
   });
+
+  // #151: image names keep the extension exactly as uploaded (`JPG`, `HEIC`,
+  // `heif`, `jfif`), and URLs are built from them as-is. Raw and archive
+  // formats (dng/ARW/zip) are not servable images.
+  describe('extension check', () => {
+    it.each(['JPG', 'JPEG', 'PNG', 'HEIC', 'heic', 'heif', 'jfif'])(
+      'serves a .%s URL from its variant',
+      async (ext) => {
+        routeFetch({ variantOk: true });
+
+        const response = await handleImageRequest(
+          new Request(`https://worker.dev/forest-trail-1002-200x150.${ext}`),
+          mockEnv
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe(VARIANT_BYTES);
+        expect(fetchedUrls()).toEqual([variantUrl('forest-trail-1002', '200x150')]);
+      }
+    );
+
+    it.each(['bmp', 'dng', 'ARW', 'zip'])('rejects a .%s URL without fetching anything', async (ext) => {
+      routeFetch({ variantOk: true });
+
+      const response = await handleImageRequest(
+        new Request(`https://worker.dev/forest-trail-1002-200x150.${ext}`),
+        mockEnv
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe('Invalid image extension');
+      expect(fetchedUrls()).toEqual([]);
+    });
+
+    it('keeps the extension case in the source URL and the redirect', async () => {
+      // The source origin may be case-sensitive: `foo.JPG` is not `foo.jpg` there.
+      routeFetch({ variantOk: false, uploadOk: true });
+
+      const response = await handleImageRequest(
+        new Request('https://worker.dev/forest-trail-1002-200x150.JPG'),
+        mockEnv
+      );
+
+      const uploadCall = fetchMock().mock.calls.find(([url]) => String(url).endsWith('/images/v1'));
+      expect((uploadCall?.[1]?.body as FormData).get('url')).toBe(
+        'https://mock-source.com/forest-trail-1002.JPG'
+      );
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(
+        'https://mock-public.com/forest-trail-1002-200x150.JPG'
+      );
+    });
+  });
 });
