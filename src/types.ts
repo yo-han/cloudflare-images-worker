@@ -87,6 +87,7 @@ export interface Config {
   RATE_LIMIT_WINDOW: number;
   MAX_REQUESTS_PER_WINDOW: number;
   DEFAULT_CACHE_TTL: number;
+  SIZELESS_VARIANT: string;
 }
 
 export interface R2HTTPMetadata {
@@ -117,4 +118,6 @@ export interface ParsedImageUrl {
   height?: number;
   extension: string;
   variant: string;
+  /** True when the URL had no `-WxH` suffix; `variant` is then CONFIG.SIZELESS_VARIANT. */
+  sizeless: boolean;
 }
