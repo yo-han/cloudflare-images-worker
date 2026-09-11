@@ -30,27 +30,6 @@ async function uploadToCloudflareImages(env: Env, sourceUrl: string, id: string)
   return response;
 }
 
-/**
- * Fetches the original image from Cloudflare Images.
- * @param {Env} env - The environment variables.
- * @param {string} id - The ID of the image.
- * @returns {Promise<Response>} The image response.
- * @throws {CloudflareApiError} If the fetch fails.
- */
-async function fetchOriginalCloudflareImage(env: Env, id: string): Promise<Response> {
-  const url = `${CONFIG.CLOUDFLARE_API_BASE}/accounts/${env.ACCOUNT_ID}/images/v1/${id}/blob`;
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Authorization': `Bearer ${env.API_TOKEN}` },
-  });
-
-  if (!response.ok && env.UPLOAD_FROM_SOURCE === false) {
-    throw new CloudflareApiError('Failed to fetch original image', response.status, await response.text());
-  }
-
-  return response;
-}
-
 function parseImageUrl(url: string): ParsedImageUrl | null {
   // Regular expression to match both URL patterns
   const regex = /^\/(.+?)(?:-(\d+)x(\d+))?\.([^\.]+)$/;
@@ -69,14 +48,18 @@ function parseImageUrl(url: string): ParsedImageUrl | null {
       width: parseInt(width) || undefined,
       height: parseInt(height) || undefined,
       extension,
-      variant: width ? `${width}x${height}`.replace(/[^a-zA-Z0-9-_]/g, "") : 'original'
+      variant: `${width}x${height}`.replace(/[^a-zA-Z0-9-_]/g, ""),
+      sizeless: false
     };
   } else {
+    // A size-less URL never maps to the original upload: that carries the
+    // uploader's EXIF, GPS included (climbfinder-api#2559).
     return {
       id: imageId.replace(/[^a-zA-Z0-9-_]/g, "-"),
       originalPath: imageId,
       extension,
-      variant: 'original'
+      variant: CONFIG.SIZELESS_VARIANT,
+      sizeless: true
     };
   }
 }
@@ -99,7 +82,7 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
       return new Response('Invalid image URL', { status: 400 });
     }
 
-	const { id, originalPath, extension, variant} = parsedImage;
+	const { id, originalPath, extension, variant, sizeless } = parsedImage;
 
   const file_path = originalPath.replace(/[^a-zA-Z0-9-_\/\.]/g, "-");
   const image_path = file_path?.replace(new RegExp(`\\.(${CLOUDFLARE_IMAGE_EXTENSIONS.join('|')})$`, 'i'), '');
@@ -127,29 +110,28 @@ export async function handleImageRequest(request: Request, env: Env): Promise<Re
       return createImageResponse(cachedImage, true);
     }
 
-    let imageResponse: Response | null = null;
-    if (variant !== '') {
-      imageResponse = await fetch(`${CONFIG.IMAGE_DELIVERY_URL}/${env.ACCOUNT_HASH}/${id}/${variant}`);
-    }    
+    const imageResponse = await fetch(`${CONFIG.IMAGE_DELIVERY_URL}/${env.ACCOUNT_HASH}/${id}/${variant}`);
 
-    if (!imageResponse || !imageResponse.ok) {
-      imageResponse = await fetchOriginalCloudflareImage(env, id);
-    } 
+    if (imageResponse.ok) {
+      await cacheStrategy.set(bucket, cacheKey, imageResponse.clone());
+      return createImageResponse(imageResponse, false);
+    }
 
-    if (env.UPLOAD_FROM_SOURCE && (!imageResponse || !imageResponse.ok)) {
+    // No fallback to the original upload (`/images/v1/<id>/blob`) on a failed
+    // variant: it returns the uploaded bytes unmodified (climbfinder-api#2559).
+    if (env.UPLOAD_FROM_SOURCE) {
       const sourceUrl = `${env.LIVE_SOURCE_URL}/${image_path}.${extension}`;
       const uploadResponse = await uploadToCloudflareImages(env, sourceUrl, id);
 
       if (uploadResponse.ok) {
-        const postfix = variant !== 'original' ? `-${variant}` : '';
+        const postfix = sizeless ? '' : `-${variant}`;
         return Response.redirect(`${env.LIVE_PUBLIC_DOMAIN}/${image_path}${postfix}.${extension}`, 302);
       } else {
         throw new CloudflareApiError('Failed to fetch and upload image', uploadResponse.status, await uploadResponse.text());
       }
     }
 
-    await cacheStrategy.set(bucket, cacheKey, imageResponse.clone());
-    return createImageResponse(imageResponse, false);
+    throw new CloudflareApiError('Failed to fetch image variant', imageResponse.status, await imageResponse.text());
   } catch (error) {
     console.error('Error processing request:', error);
     
