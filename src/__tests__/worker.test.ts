@@ -282,8 +282,8 @@ describe('handleImageRequest', () => {
       expect(await response.text()).toBe(VARIANT_BYTES);
     });
 
-    // A client calls DELETE after it changes an image at the source, so the next
-    // GET fetches fresh variants instead of a year-old R2 copy.
+    // A client calls DELETE after it replaces an image in Cloudflare Images, so
+    // the next GET fetches the new variants instead of a year-old R2 copy.
     it('deletes every cached variant of an image across list pages', async () => {
       bucket()
         .list.mockResolvedValueOnce({

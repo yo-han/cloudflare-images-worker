@@ -71,7 +71,9 @@ Before you begin, ensure you have met the following requirements:
 
 `KV_NAMESPACE_ID` is optional and only needed when `RATELIMIT_ENABLED=true`. Without it, `npm run update-config` leaves the KV binding out of `wrangler.toml`; with rate limiting enabled it refuses to render.
 
-`API_TOKEN` is a Worker secret and is never written to `wrangler.toml`. Set it once per Worker with `npx wrangler secret put API_TOKEN`.
+`API_TOKEN` is a Worker secret and is never written to `wrangler.toml`. Set it with `npx wrangler secret put API_TOKEN`.
+
+**Upgrading a deployment that has `API_TOKEN` as a plain variable:** `wrangler deploy` overrides dashboard variables with the ones in `wrangler.toml` (unless `keep_vars = true`), while secrets are kept. Delete the `API_TOKEN` variable in the dashboard, add the secret with `npx wrangler secret put API_TOKEN`, then deploy. Until the secret exists, uploads to Cloudflare Images fail.
 
 ## Usage
 
@@ -100,7 +102,7 @@ https://cdn.example.com/id-variant.extension
 
 **Other requests:**
 
-- `DELETE /<id>.<ext>` removes every cached R2 variant of that image (`<CACHE_KEY_PREFIX>/<id>/*`), so the next GET fetches fresh variants from Cloudflare Images. Use it after an image changes at the source.
+- `DELETE /<id>.<ext>` removes every cached R2 variant of that image (`<CACHE_KEY_PREFIX>/<id>/*`). It clears only the R2 cache: the next GET fetches the variant from Cloudflare Images again. Use it after the image in Cloudflare Images has been replaced or its variants changed. While Cloudflare Images still holds the image, a GET does not read `LIVE_SOURCE_URL`, so a changed source file is not picked up by a purge alone.
 - `GET /robots.txt` returns an empty 200.
 
 

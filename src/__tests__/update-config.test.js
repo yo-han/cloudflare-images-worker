@@ -60,8 +60,7 @@ describe('renderWranglerToml', () => {
   });
 
   // API_TOKEN is a Worker secret. As a [vars] entry it would sit in plaintext in
-  // wrangler.toml and the dashboard, and wrangler refuses a var named like an
-  // existing secret.
+  // wrangler.toml and the dashboard.
   it('never renders API_TOKEN into [vars], even when it is set', () => {
     const toml = renderWranglerToml(template, { ...baseEnv, API_TOKEN: 'sentinel-images-credential' });
 

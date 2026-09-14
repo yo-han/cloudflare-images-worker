@@ -12,7 +12,8 @@ const KV_NAMESPACES_BLOCK = /^kv_namespaces = \[[\s\S]*?^\]\n\n?/m;
  * rate limiting without it is refused.
  *
  * API_TOKEN is never rendered: it is a Worker secret (`wrangler secret put
- * API_TOKEN`), and wrangler refuses a var with the same name as a secret.
+ * API_TOKEN`). As a var it would sit in plaintext in wrangler.toml and the
+ * dashboard.
  * @param {string} template - Contents of wrangler.toml.tpl.
  * @param {Record<string, string | undefined>} env - Configuration values (e.g. from .env).
  * @returns {string} The rendered wrangler.toml.

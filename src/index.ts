@@ -184,9 +184,11 @@ function createImageResponse(response: Response | R2ObjectBody, isCacheHit: bool
 }
 
 /**
- * Deletes every cached R2 variant of an image. Call it after an image changes
- * at the source, so the next GET fetches fresh variants from Cloudflare Images
- * instead of a year-old R2 copy.
+ * Deletes every cached R2 variant of an image, so the next GET fetches the
+ * variant from Cloudflare Images again instead of serving a year-old R2 copy.
+ * It clears only the R2 cache: call it after the image in Cloudflare Images has
+ * been replaced. It does not read the source, so a changed source file alone
+ * is not picked up.
  * @param {Request} request - The incoming DELETE request.
  * @param {Env} env - The environment variables.
  * @returns {Promise<Response>} 200 once every variant under the image id is gone.

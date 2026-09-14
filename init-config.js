@@ -72,7 +72,7 @@ async function init() {
   writeEnvFile();
   updateWranglerToml();
   console.log('Configuration complete. You can now build and deploy your worker.');
-  console.log('Set the Cloudflare API token as a Worker secret first: npx wrangler secret put API_TOKEN');
+  console.log('Set the Cloudflare API token as a Worker secret: npx wrangler secret put API_TOKEN (see the README when upgrading from a plain variable)');
   rl.close();
 }
 
