@@ -1,4 +1,4 @@
-import { handleImageRequest } from '../index';
+import worker, { handleImageRequest } from '../index';
 import { Env } from '../types';
 
 // Mock console.warn and console.error
@@ -253,6 +253,138 @@ describe('handleImageRequest', () => {
       expect(response.headers.get('location')).toBe(
         'https://mock-public.com/forest-trail-1002-200x150.JPG'
       );
+    });
+  });
+
+  // robots.txt, DELETE (cache purge) and method handling.
+  describe('request routing', () => {
+    const workerFetch = (request: Request) => worker.fetch(request, mockEnv);
+    const bucket = () => mockEnv.R2_IMAGES_BUCKET as unknown as { list: jest.Mock; delete: jest.Mock };
+
+    beforeEach(() => {
+      Object.assign(mockEnv.R2_IMAGES_BUCKET, { list: jest.fn(), delete: jest.fn() });
+    });
+
+    it('answers /robots.txt with an empty 200', async () => {
+      const response = await workerFetch(new Request('https://worker.dev/robots.txt'));
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('');
+      expect(fetchMock()).not.toHaveBeenCalled();
+    });
+
+    it('routes GET through the image handler', async () => {
+      routeFetch({ variantOk: true });
+
+      const response = await workerFetch(new Request('https://worker.dev/hill-view-200x150.png'));
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(VARIANT_BYTES);
+    });
+
+    // A client calls DELETE after it replaces an image in Cloudflare Images, so
+    // the next GET fetches the new variants instead of a year-old R2 copy.
+    it('deletes every cached variant of an image across list pages', async () => {
+      bucket()
+        .list.mockResolvedValueOnce({
+          objects: [{ key: `${CACHE_KEY_PREFIX}/hill-view/200x150` }, { key: `${CACHE_KEY_PREFIX}/hill-view/2048x0` }],
+          truncated: true,
+          cursor: 'page-2',
+        })
+        .mockResolvedValueOnce({ objects: [{ key: `${CACHE_KEY_PREFIX}/hill-view/original` }], truncated: false });
+
+      const response = await workerFetch(new Request('https://worker.dev/hill-view.png', { method: 'DELETE' }));
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('All variants deleted successfully');
+      // Trailing slash: `hill-view/` must not also match `hill-view-south/`.
+      expect(bucket().list.mock.calls).toEqual([
+        [{ prefix: `${CACHE_KEY_PREFIX}/hill-view/` }],
+        [{ prefix: `${CACHE_KEY_PREFIX}/hill-view/`, cursor: 'page-2' }],
+      ]);
+      expect(bucket().delete.mock.calls).toEqual([
+        [[`${CACHE_KEY_PREFIX}/hill-view/200x150`, `${CACHE_KEY_PREFIX}/hill-view/2048x0`]],
+        [[`${CACHE_KEY_PREFIX}/hill-view/original`]],
+      ]);
+      expect(fetchMock()).not.toHaveBeenCalled();
+    });
+
+    it('clears all variants when the DELETE names a sized URL, and skips an empty delete', async () => {
+      bucket().list.mockResolvedValueOnce({ objects: [], truncated: false });
+
+      const response = await workerFetch(new Request('https://worker.dev/hill-view-200x150.png', { method: 'DELETE' }));
+
+      expect(response.status).toBe(200);
+      expect(bucket().list.mock.calls).toEqual([[{ prefix: `${CACHE_KEY_PREFIX}/hill-view/` }]]);
+      expect(bucket().delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects a DELETE without a parsable image URL', async () => {
+      const response = await workerFetch(new Request('https://worker.dev/', { method: 'DELETE' }));
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe('Invalid image URL');
+      expect(bucket().list).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 and logs the prefix when R2 fails during a DELETE', async () => {
+      bucket().list.mockRejectedValueOnce(new Error('R2 unavailable'));
+
+      const response = await workerFetch(new Request('https://worker.dev/hill-view.png', { method: 'DELETE' }));
+
+      expect(response.status).toBe(500);
+      expect(console.error).toHaveBeenCalledWith(
+        'Error deleting variants:',
+        expect.objectContaining({ prefix: `${CACHE_KEY_PREFIX}/hill-view/` })
+      );
+    });
+
+    it.each(['POST', 'PUT', 'PATCH'])('rejects %s with 405 and names the allowed methods', async (method) => {
+      const response = await workerFetch(new Request('https://worker.dev/hill-view.png', { method }));
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get('Allow')).toBe('GET, DELETE');
+      expect(bucket().list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('KV binding', () => {
+    const requestWithIp = () =>
+      new Request('https://worker.dev/hill-view-200x150.png', { headers: { 'CF-Connecting-IP': '203.0.113.7' } });
+
+    it('serves without a KV binding when rate limiting is off', async () => {
+      delete (mockEnv as Partial<Env>).KV_STORE;
+      routeFetch({ variantOk: true });
+
+      const response = await handleImageRequest(requestWithIp(), mockEnv);
+
+      expect(response.status).toBe(200);
+    });
+
+    it('fails loudly when rate limiting is on but no KV binding exists', async () => {
+      delete (mockEnv as Partial<Env>).KV_STORE;
+      mockEnv.RATELIMIT_ENABLED = true;
+      routeFetch({ variantOk: true });
+
+      const response = await handleImageRequest(requestWithIp(), mockEnv);
+
+      expect(response.status).toBe(500);
+      expect(fetchMock()).not.toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalledWith(
+        'Error processing request:',
+        expect.objectContaining({ message: 'RATELIMIT_ENABLED is true but no KV_STORE binding is configured' })
+      );
+    });
+
+    it('still rate limits through KV when it is bound', async () => {
+      mockEnv.RATELIMIT_ENABLED = true;
+      (mockEnv.KV_STORE!.get as unknown as jest.Mock).mockResolvedValue({ count: 1000, timestamp: Date.now() });
+      routeFetch({ variantOk: true });
+
+      const response = await handleImageRequest(requestWithIp(), mockEnv);
+
+      expect(response.status).toBe(429);
+      expect(fetchMock()).not.toHaveBeenCalled();
     });
   });
 });
