@@ -69,6 +69,10 @@ Before you begin, ensure you have met the following requirements:
 
 3. (Optional) Manually edit the `.env` file to adjust any settings.
 
+`KV_NAMESPACE_ID` is optional and only needed when `RATELIMIT_ENABLED=true`. Without it, `npm run update-config` leaves the KV binding out of `wrangler.toml`; with rate limiting enabled it refuses to render.
+
+`API_TOKEN` is a Worker secret and is never written to `wrangler.toml`. Set it once per Worker with `npx wrangler secret put API_TOKEN`.
+
 ## Usage
 
 Once deployed, the worker will handle image requests in the following format:
@@ -93,6 +97,11 @@ https://cdn.example.com/id.extension
 # With variant
 https://cdn.example.com/id-variant.extension
 ```
+
+**Other requests:**
+
+- `DELETE /<id>.<ext>` removes every cached R2 variant of that image (`<CACHE_KEY_PREFIX>/<id>/*`), so the next GET fetches fresh variants from Cloudflare Images. Use it after an image changes at the source.
+- `GET /robots.txt` returns an empty 200.
 
 
 
