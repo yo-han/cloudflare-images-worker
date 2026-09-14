@@ -8,7 +8,8 @@ export interface Env {
   ACCOUNT_HASH: string;
   LIVE_SOURCE_URL: string;
   LIVE_PUBLIC_DOMAIN: string;
-  KV_STORE: KVNamespace;
+  /** Only bound when rate limiting is enabled (RATELIMIT_ENABLED). */
+  KV_STORE?: KVNamespace;
   RATELIMIT_ENABLED: boolean;
   CACHE_KEY_PREFIX: string;
   UPLOAD_FROM_SOURCE: boolean;

@@ -183,12 +183,55 @@ function createImageResponse(response: Response | R2ObjectBody, isCacheHit: bool
   return new Response(body, { headers, status });
 }
 
+/**
+ * Deletes every cached R2 variant of an image. Call it after an image changes
+ * at the source, so the next GET fetches fresh variants from Cloudflare Images
+ * instead of a year-old R2 copy.
+ * @param {Request} request - The incoming DELETE request.
+ * @param {Env} env - The environment variables.
+ * @returns {Promise<Response>} 200 once every variant under the image id is gone.
+ */
+export async function handleDeleteRequest(request: Request, env: Env): Promise<Response> {
+  const parsedImage = parseImageUrl(new URL(request.url).pathname);
+  if (!parsedImage || !parsedImage.id) {
+    return new Response('Invalid image URL', { status: 400 });
+  }
+
+  // Trailing slash: `<prefix>/foo/` must not also match `<prefix>/foo-bar/`.
+  const prefix = `${env.CACHE_KEY_PREFIX}/${parsedImage.id}/`;
+
+  try {
+    let cursor: string | undefined;
+    do {
+      const listed = await env.R2_IMAGES_BUCKET.list({ prefix, cursor });
+      const keys = listed.objects.map((object) => object.key);
+      if (keys.length > 0) {
+        await env.R2_IMAGES_BUCKET.delete(keys);
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor);
+
+    return new Response('All variants deleted successfully', { status: 200 });
+  } catch (error) {
+    console.error('Error deleting variants:', { prefix, error });
+    return new Response('Internal Server Error', { status: 500 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method !== 'GET') {
-      return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET' } });
+    if (new URL(request.url).pathname === '/robots.txt') {
+      return new Response('', { status: 200 });
     }
-    return handleImageRequest(request, env);
+
+    switch (request.method) {
+      case 'GET':
+        return handleImageRequest(request, env);
+      case 'DELETE':
+        return handleDeleteRequest(request, env);
+      default:
+        return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET, DELETE' } });
+    }
   },
 };
 

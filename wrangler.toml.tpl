@@ -6,8 +6,8 @@ kv_namespaces = [
   { binding = "KV_STORE", id = "<kv_namespace_id>" }
 ]
 
+# API_TOKEN is a Worker secret, not a var: npx wrangler secret put API_TOKEN
 [vars]
-API_TOKEN = "<cloudflare-api-token>"
 ACCOUNT_ID = "<account_id>"
 ACCOUNT_HASH = "<account_hash>"
 LIVE_SOURCE_URL = "https://cdn.example.com/path/"
